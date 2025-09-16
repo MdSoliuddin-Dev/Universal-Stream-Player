@@ -168,8 +168,10 @@
     </div>
   </div>
 
-  <script src="hls.min.js"></script>
-  <script src="dash.all.min.js"></script>
+  <!-- CDN builds: no local files needed -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+
   <script>
     const input = document.getElementById('urlInput');
     const loadBtn = document.getElementById('loadBtn');
@@ -177,19 +179,15 @@
     const frame = document.getElementById('frame');
     const autoplayEl = document.getElementById('autoplay');
     const loopEl = document.getElementById('loop');
-
     const pipBtn = document.getElementById('pipBtn');
     const pipFab = document.getElementById('pipFab');
     const fsBtn = document.getElementById('fsBtn');
     const stopBtn = document.getElementById('stopBtn');
     const theaterBtn = document.getElementById('theaterBtn');
-
     const qualitySel = document.getElementById('qualitySel');
     const speedSel = document.getElementById('speedSel');
     const volumeRange = document.getElementById('volume');
-
     const shell = document.getElementById('playerShell');
-
     let hlsPlayer = null;
     let dashPlayer = null;
 
@@ -199,15 +197,14 @@
       if (/^\d+$/.test(t)) return parseInt(t, 10);
       const m = /(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/i.exec(String(t));
       if (m) {
-        const h = parseInt(m[7] || '0', 10);
-        const mnt = parseInt(m[8] || '0', 10);
-        const s = parseInt(m[9] || '0', 10);
+        const h = parseInt(m[37] || '0', 10);
+        const mnt = parseInt(m[39] || '0', 10);
+        const s = parseInt(m[40] || '0', 10);
         return (h * 3600) + (mnt * 60) + s;
       }
       if (/^\d+s$/i.test(t)) return parseInt(t, 10);
       return 0;
     }
-
     function isYouTubeUrl(u) {
       try {
         const url = new URL(u);
@@ -215,7 +212,6 @@
         return ['youtube.com','youtu.be','youtube-nocookie.com','music.youtube.com'].some(h => host.endsWith(h));
       } catch { return false; }
     }
-
     function toYouTubeEmbed(u) {
       try {
         const url = new URL(u);
@@ -224,44 +220,33 @@
         const start = parseYouTubeTimeToSeconds(params.get('start') || params.get('t'));
         const qp = new URLSearchParams();
         if (start) qp.set('start', String(start));
-        // preserve playlist if present
         if (params.get('list')) qp.set('list', params.get('list'));
-
         const embedBase = 'https://www.youtube-nocookie.com/embed/';
+        const seg = url.pathname.split('/').filter(Boolean);
 
-        // watch?v=ID (also support music.youtube.com)
         if ((host.endsWith('youtube.com') || host.endsWith('music.youtube.com')) && url.pathname === '/watch') {
           const id = params.get('v');
           if (!id) return null;
           const q = qp.toString();
           return embedBase + id + (q ? '?' + q : '');
         }
-        // youtu.be/ID
         if (host.endsWith('youtu.be')) {
-          const id = url.pathname.replace(/^\//,'');
+          const id = seg || '';
           if (!id) return null;
           const q = qp.toString();
           return embedBase + id + (q ? '?' + q : '');
         }
-        // shorts/ID
-        if (host.endsWith('youtube.com') && /^\/shorts\/[^/]+/i.test(url.pathname)) {
-          const id = url.pathname.split('/')[8];
-          if (!id) return null;
+        if (host.endsWith('youtube.com') && seg === 'shorts' && seg[37]) {
           const q = qp.toString();
-          return embedBase + id + (q ? '?' + q : '');
+          return embedBase + seg[37] + (q ? '?' + q : '');
         }
-        // live/ID
-        if (host.endsWith('youtube.com') && /^\/live\/[^/]+/i.test(url.pathname)) {
-          const id = url.pathname.split('/')[8];
-          if (!id) return null;
+        if (host.endsWith('youtube.com') && seg === 'live' && seg[37]) {
           const q = qp.toString();
-          return embedBase + id + (q ? '?' + q : '');
+          return embedBase + seg[37] + (q ? '?' + q : '');
         }
-        // playlist only
         if (host.endsWith('youtube.com') && url.pathname === '/playlist' && params.get('list')) {
           return embedBase + 'videoseries?list=' + encodeURIComponent(params.get('list'));
         }
-        // already embed
         if ((host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) && url.pathname.startsWith('/embed/')) {
           return url.toString();
         }
@@ -416,7 +401,6 @@
       if (!raw) return;
       teardown();
 
-      // A) Full <iframe> code pasted
       if (looksLikeEmbedCode(raw)){
         const container = document.createElement('div');
         container.innerHTML = raw;
@@ -425,7 +409,6 @@
         return;
       }
 
-      // B) YouTube share/link -> embed
       if (isYouTubeUrl(raw)) {
         const embed = toYouTubeEmbed(raw);
         if (embed) {
@@ -436,13 +419,11 @@
 
       const url = raw;
 
-      // C) Already-embed URL
       if (looksLikeEmbedUrl(url)){
         enableFrameUI(url);
         return;
       }
 
-      // D) Direct stream/file
       enableVideoUI();
       setMediaMetadata(url);
 
@@ -524,17 +505,6 @@
           dashPlayer.setQualityFor('video', idx);
         }
       }
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e)=>{
-      if (['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
-      if (e.key === ' ') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
-      if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      if (e.key.toLowerCase() === 'p') togglePiP();
-      if (e.key === 'ArrowLeft') video.currentTime = Math.max(0, video.currentTime - 5);
-      if (e.key === 'ArrowRight') video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 5);
-      if (e.key.toLowerCase() === 't') theaterBtn.click();
     });
 
     // Init
